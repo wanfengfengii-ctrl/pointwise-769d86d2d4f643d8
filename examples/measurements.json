@@ -1,0 +1,26 @@
+{
+  "initial": {
+    "line-a": [
+      {"source": {"record": "A-source", "segment": "strip-A1"}, "draw": "U", "choices": [
+        {"treated": "10", "control": "10", "quota": 0},
+        {"treated": "11", "control": "10", "quota": 1}
+      ]}
+    ],
+    "line-b": [
+      {"source": {"record": "B-source", "segment": "strip-B1"}, "draw": "U", "choices": [
+        {"treated": "11", "control": "10", "quota": 0},
+        {"treated": "10", "control": "10", "quota": 0}
+      ]},
+      {"source": {"record": "B-source", "segment": "strip-B2"}, "draw": "V", "choices": [
+        {"treated": "10", "control": "10", "quota": 0},
+        {"treated": "10", "control": "10", "quota": 1}
+      ]}
+    ]
+  },
+  "correction": [
+    {"source": {"record": "B-source", "segment": "strip-B1"}, "draw": "U", "choices": [
+      {"treated": "10", "control": "10", "quota": 0},
+      {"treated": "11", "control": "10", "quota": 0}
+    ]}
+  ]
+}

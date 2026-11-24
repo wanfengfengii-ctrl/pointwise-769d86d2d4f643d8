@@ -1,0 +1,7 @@
+{
+  "trial_id": "strip-01",
+  "roles": ["line-a", "line-b"],
+  "public_draws": ["U"],
+  "private_draws": {"line-b": ["V"]},
+  "local_rules": {}
+}
