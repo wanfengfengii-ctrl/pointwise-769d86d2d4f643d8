@@ -4,8 +4,9 @@ from dataclasses import dataclass
 
 from design.protocol import validate_roles
 from design.shared_draws import draw_names, require_bit
-from issue.envelope import StationEnvelope, content_fingerprint, decode_envelope
+from issue.envelope import ENVELOPE_V1, ENVELOPE_V2, StationEnvelope, content_fingerprint, decode_envelope
 from issue.evidence import EvidenceCount
+from issue.executable import ExecutableAllocation, parse_executable_entry
 from values import object_fields, rational, require_int
 
 
@@ -17,6 +18,7 @@ class ValidatedStation:
     private_draw_count: int
     counts: tuple[EvidenceCount, ...]
     fingerprint: str
+    allocations: tuple[ExecutableAllocation, ...] = ()
 
 
 def _parse_counts(raw_counts, public_count, private_count):
@@ -49,10 +51,34 @@ def _parse_counts(raw_counts, public_count, private_count):
     return tuple(counts)
 
 
+def _parse_allocations(raw_allocations, public_count, private_count):
+    if not isinstance(raw_allocations, list):
+        raise ValueError('executable station piece must list its allocations')
+    if len(raw_allocations) > 1 << (public_count + private_count):
+        raise ValueError('invalid executable allocation table size')
+    seen_ids = set()
+    seen_keys = set()
+    allocations = []
+    for raw in raw_allocations:
+        allocation = parse_executable_entry(raw, public_count)
+        if allocation.allocation_id in seen_ids:
+            raise ValueError('duplicate executable allocation identity')
+        seen_ids.add(allocation.allocation_id)
+        key = (allocation.public_values, allocation.quota)
+        seen_keys.add(key)
+        allocations.append(allocation)
+    if [item.allocation_id for item in allocations] != sorted(seen_ids):
+        raise ValueError('executable allocation entries must be ordered by identity')
+    return tuple(allocations)
+
+
 def validate_station(wire):
     envelope = decode_envelope(wire)
-    raw = object_fields(json.loads(envelope.body),
-                        ('roles', 'public_draws', 'private_draw_count', 'counts'))
+    if envelope.version == ENVELOPE_V1:
+        body_fields = ('roles', 'public_draws', 'private_draw_count', 'counts')
+    else:
+        body_fields = ('roles', 'public_draws', 'private_draw_count', 'allocations')
+    raw = object_fields(json.loads(envelope.body), body_fields)
     roles = validate_roles(raw['roles'])
     if envelope.role not in roles:
         raise ValueError('issuing role is outside the protocol roles')
@@ -60,5 +86,9 @@ def validate_station(wire):
     private = require_int(raw['private_draw_count'], 'private draw count', 0)
     if list(public) != raw['public_draws'] or len(public) > 3 or len(public) + private > 6:
         raise ValueError('invalid public draw order or station draw count')
-    counts = _parse_counts(raw['counts'], len(public), private)
-    return ValidatedStation(envelope, roles, public, private, counts, content_fingerprint(envelope))
+    fingerprint = content_fingerprint(envelope)
+    if envelope.version == ENVELOPE_V1:
+        counts = _parse_counts(raw['counts'], len(public), private)
+        return ValidatedStation(envelope, roles, public, private, counts, fingerprint)
+    allocations = _parse_allocations(raw['allocations'], len(public), private)
+    return ValidatedStation(envelope, roles, public, private, (), fingerprint, allocations)
